@@ -36,7 +36,7 @@ GET /api/classify?name={name}
 ### Clone repository
 
 ```bash
-git clone <your-repo-url>
+git clone https://github.com/ikennarichard/genderize-classifier
 cd genderize-classifier
 ```
 
