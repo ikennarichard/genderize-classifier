@@ -7,9 +7,9 @@ A fast, lightweight Go API that extends the [Genderize.io](https://genderize.io)
 - Single GET endpoint for name gender classification
 - Returns structured response with confidence score
 
-## API Endpoint
+### API Endpoint
 
-### Classify Name
+#### Classify Name
 
 ```bash
 GET /api/classify?name={name}
