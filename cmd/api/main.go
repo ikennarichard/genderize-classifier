@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -11,6 +12,9 @@ import (
 
 func main() {
     mux := http.NewServeMux()
+      mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+    fmt.Fprintln(w, "Up and running")
+  })
     mux.HandleFunc("GET /api/classify", handler.Classify)
 
     port := os.Getenv("PORT")
