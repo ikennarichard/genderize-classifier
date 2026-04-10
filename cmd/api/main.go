@@ -7,7 +7,6 @@ import (
 	"os"
 	"time"
 
-	handler "github.com/ikennarichard/genderize/internal/api"
 )
 
 func main() {
