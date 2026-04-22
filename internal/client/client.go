@@ -36,8 +36,10 @@ type Country struct {
 func fetchJSON(apiURL string, target any) error {
 	resp, err := httpClient.Get(apiURL)
 	if err != nil {
+		fmt.Println("error:", err)
 		return err
 	}
+	// fmt.Println("data:", resp)
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
