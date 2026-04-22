@@ -2,20 +2,27 @@ package main
 
 import (
 	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"time"
 
-	"github.com/ikennarichard/genderize-classifier/internal/handler"
-	"github.com/ikennarichard/genderize-classifier/internal/store"
+	"github.com/ikennarichard/genderize-classifier/internal/config"
+	handler "github.com/ikennarichard/genderize-classifier/internal/handler/http"
+	"github.com/ikennarichard/genderize-classifier/internal/repository"
 )
 
 func main() {
-	s := store.New()
-	h := handler.New(s)
+	pool := config.Load()
+
+	defer pool.Close()
+	
+	profileRepo := repository.NewPostgresProfileRepository(pool)
+	profileHandler := handler.New(profileRepo)
+
 
 	mux := http.NewServeMux()
-	h.RegisterRoutes(mux)
+	profileHandler.RegisterProfileRoutes(mux)
 
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -24,7 +31,7 @@ func main() {
 
 	server := &http.Server{
 		Addr:         ":" + port,
-		Handler:      withCORS(mux),
+		Handler:      withCORS(loggingMiddleware(mux)),
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 15 * time.Second,
 		IdleTimeout:  60 * time.Second,
@@ -44,5 +51,20 @@ func withCORS(next http.Handler) http.Handler {
 			return
 		}
 		next.ServeHTTP(w, r)
+	})
+}
+
+func loggingMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+
+		next.ServeHTTP(w, r)
+
+		slog.Info("request completed",
+			"method", r.Method,
+			"path", r.URL.Path,
+			"duration", time.Since(start),
+			"remote_addr", r.RemoteAddr,
+		)
 	})
 }

@@ -13,3 +13,7 @@
 *.bin
 *.out
 *.app
+*.env
+.env
+.env*
+*.rest
