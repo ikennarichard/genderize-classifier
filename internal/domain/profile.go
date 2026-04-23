@@ -33,6 +33,9 @@ type ProfileFilters struct {
     MaxAge         *int
     MinGenderProb  *float64
     MinCountryProb *float64
+    SortBy string // age | created_at | gender_probability
+    Order  string // asc | desc
+    Page   int
 }
 
 type ProfileRepository interface {
@@ -42,5 +45,5 @@ type ProfileRepository interface {
 	Update(ctx context.Context, profile *Profile) error
 	Delete(ctx context.Context, id string) error
 	List(ctx context.Context, filters ProfileFilters) ([]*Profile, error)
-    GetFiltered(ctx context.Context, f ProfileFilters) ([]Profile, error)
+    GetFiltered(ctx context.Context, f ProfileFilters) ([]Profile, int, error)
 }

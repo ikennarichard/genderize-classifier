@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/ikennarichard/genderize-classifier/internal/domain"
 	"github.com/ikennarichard/genderize-classifier/internal/service"
@@ -25,6 +26,49 @@ func (h *Handler) RegisterProfileRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/profiles/{id}", h.getProfile)
 	mux.HandleFunc("GET /api/profiles", h.listProfiles)
 	mux.HandleFunc("DELETE /api/profiles/{id}", h.deleteProfile)
+	mux.HandleFunc("GET /api/profiles/search", h.searchProfiles)
+}
+
+
+func (h *Handler) searchProfiles(w http.ResponseWriter, r *http.Request) {
+	queryStr := r.URL.Query().Get("q")
+	if queryStr == "" {
+		utils.RespondError(w, http.StatusBadRequest, "Query parameter 'q' is required")
+		return
+	}
+
+	filters, err := service.ParseNaturalLanguage(queryStr)
+	if err != nil {
+		utils.RespondError(w, http.StatusBadRequest, "Unable to interpret query")
+		return
+	}
+
+	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	if page < 1 { page = 1 }
+	if limit <= 0 || limit > 50 { limit = 10 }
+	
+	filters.Page = page
+	filters.Limit = limit
+
+    if err := filters.Validate(); err != nil {
+        utils.RespondError(w, http.StatusBadRequest, "Invalid query parameters")
+        return
+    }
+
+	profiles, total, err := h.repo.GetFiltered(r.Context(), filters)
+	if err != nil {
+		utils.RespondError(w, 500, "Database error")
+		return
+	}
+
+	utils.Respond(w, http.StatusOK, map[string]any{
+		"status": "success",
+		"page":   page,
+		"limit":  limit,
+		"total":  total,
+		"data":   mapToDTOs(profiles),
+	})
 }
 
 func (h *Handler) createProfile(w http.ResponseWriter, r *http.Request) {
@@ -42,7 +86,7 @@ func (h *Handler) createProfile(w http.ResponseWriter, r *http.Request) {
 
 	existing, err := h.repo.GetByName(r.Context(), name)
 	if err == nil && existing != nil {
-        dataResponse := fromDomain(existing) // Now this is safe
+        dataResponse := fromDomain(existing)
         utils.Respond(w, http.StatusOK, ProfileResponse{
             Status:  "success",
             Message: "Profile already exists",
@@ -68,8 +112,8 @@ func (h *Handler) createProfile(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) getProfile(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	profile, err := h.repo.GetByID(r.Context(), id)
-	// fmt.Println("profile by")
 	if err != nil {
+		fmt.Println("GetProfile Error:", err)
 		utils.RespondError(w, http.StatusNotFound, "Profile not found")
 		return
 	}
@@ -96,13 +140,28 @@ func (h *Handler) listProfiles(w http.ResponseWriter, r *http.Request) {
         return &f, nil
     }
 
+		page, err := strconv.Atoi(q.Get("page"))
+		if err != nil || page < 1 {
+        page = 1
+    }
+    limit, err := strconv.Atoi(q.Get("limit"))
+		if err != nil || limit <= 0 {
+        limit = 10
+    }
+    if limit > 50 {
+        limit = 50
+    }
+
     filters := domain.ProfileFilters{
         Gender:    strings.TrimSpace(q.Get("gender")),
         AgeGroup:  strings.TrimSpace(q.Get("age_group")),
         CountryID: strings.TrimSpace(q.Get("country_id")),
+				SortBy: q.Get("sort_by"),
+        Order:  q.Get("order"),
+        Page:   page,
+        Limit:  limit,
     }
 
-    var err error
     if filters.MinAge, err = parseInt("min_age"); err != nil {
         utils.RespondError(w, http.StatusUnprocessableEntity, "Invalid min_age parameter")
         return
@@ -120,10 +179,15 @@ func (h *Handler) listProfiles(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    profiles, err := h.repo.GetFiltered(r.Context(), filters)
+    if err := filters.Validate(); err != nil {
+        utils.RespondError(w, http.StatusBadRequest, "Invalid query parameters")
+        return
+    }
+
+		profiles, total, err := h.repo.GetFiltered(r.Context(), filters)
     if err != nil {
-        fmt.Println("list_profiles_failed", "error", err)
-        utils.RespondError(w, http.StatusInternalServerError, "Internal server error")
+			fmt.Println("GetFiltered Error:", err.Error())
+        utils.RespondError(w, 500, "Database failure")
         return
     }
 
@@ -135,6 +199,9 @@ func (h *Handler) listProfiles(w http.ResponseWriter, r *http.Request) {
     utils.Respond(w, http.StatusOK, map[string]any{
         "status": "success",
         "count":  len(data),
+				"page":   filters.Page,
+        "limit":  filters.Limit,
+        "total":  total,
         "data":   data,
     })
 }
@@ -149,7 +216,6 @@ func (h *Handler) deleteProfile(w http.ResponseWriter, r *http.Request) {
 }
 
 func fromDomain(p *domain.Profile) ProfileDTO {
-
 	return ProfileDTO{
 		ID:                 p.ID.String(),
 		Name:               p.Name,
@@ -161,6 +227,16 @@ func fromDomain(p *domain.Profile) ProfileDTO {
 		CountryID:          p.CountryID,
 		CountryName:        p.CountryName,
 		CountryProbability: p.CountryProbability,
-		CreatedAt:           p.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		CreatedAt:           p.CreatedAt.Format(time.RFC3339),
 	}
+}
+
+func mapToDTOs(profiles []domain.Profile) []ProfileDTO {
+	dtos := make([]ProfileDTO, len(profiles))
+	
+	for i, p := range profiles {
+		dtos[i] = fromDomain(&p)
+	}
+	
+	return dtos
 }
