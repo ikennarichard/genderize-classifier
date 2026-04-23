@@ -1,6 +1,6 @@
 # Genderize Classifier
 
-A high-performance demographic intelligence API that transforms raw data into searchable insights.
+A high-performance intuitive query engine.
 
 ## Features
 
