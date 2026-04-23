@@ -12,10 +12,9 @@ import (
 func Load() (*pgxpool.Pool, context.Context) {
 	ctx := context.Background()
 
-	err := godotenv.Load()
-  if err != nil {
-    log.Fatal("Error loading .env file", err)
-  }
+	if err := godotenv.Load(); err != nil {
+			log.Println("Running in production, skipping .env")
+	}
 
 	connStr := os.Getenv("DATABASE_URL")
 	if connStr == "" {
