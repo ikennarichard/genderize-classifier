@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"log/slog"
 	"net/http"
@@ -13,13 +14,16 @@ import (
 )
 
 func main() {
-	pool := config.Load()
-
+	pool, ctx := config.Load()
 	defer pool.Close()
 	
 	profileRepo := repository.NewPostgresProfileRepository(pool)
 	profileHandler := handler.New(profileRepo)
 
+	err := profileRepo.SeedFromJSON(ctx, "seed_profiles.json")
+	if err != nil {
+			fmt.Println("seeding failed", "error", err)
+	}
 
 	mux := http.NewServeMux()
 	profileHandler.RegisterProfileRoutes(mux)

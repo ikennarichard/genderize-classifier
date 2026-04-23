@@ -9,7 +9,7 @@ import (
 	"github.com/joho/godotenv"
 )
 
-func Load() *pgxpool.Pool {
+func Load() (*pgxpool.Pool, context.Context) {
 	ctx := context.Background()
 
 	err := godotenv.Load()
@@ -37,7 +37,8 @@ func Load() *pgxpool.Pool {
 	}
 	
 	log.Println("Successfully connected to PostgreSQL via pgxpool")
-	return pool
+
+	return pool, ctx
 }
 
 func getEnv(key, defaultVal string) string {
