@@ -22,6 +22,15 @@ func New(repo domain.ProfileRepository) *ProfileHandler {
 	return &ProfileHandler{repo: repo}
 }
 
+func (h *ProfileHandler) DeleteProfile(w http.ResponseWriter, r *http.Request) {
+    id := r.PathValue("id")
+    if err := h.repo.Delete(r.Context(), id); err != nil {
+        utils.RespondError(w, http.StatusNotFound, "Profile not found")
+        return
+    }
+    w.WriteHeader(http.StatusNoContent)
+}
+
 
 func (h *ProfileHandler) SearchProfiles(w http.ResponseWriter, r *http.Request) {
     queryStr := strings.TrimSpace(r.URL.Query().Get("q"))
