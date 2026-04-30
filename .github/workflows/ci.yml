@@ -1,6 +1,8 @@
-name: Insighta Labs+ CI
+name: CI
 
 on:
+  push:
+    branches: [main]
   pull_request:
     branches: [main]
 
@@ -10,19 +12,23 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-go@v5
         with:
           go-version: '1.22'
-
-      - name: Install golangci-lint
-        uses: golangci/golangci-lint-action@v4
+      - uses: golangci/golangci-lint-action@v4
         with:
           version: latest
 
   test:
     name: Test
     runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/genderize_test
+      JWT_SECRET: test-secret
+      GITHUB_CLIENT_ID: test-id
+      GITHUB_CLIENT_SECRET: test-secret
+      GITHUB_REDIRECT_URL: http://localhost:8080/auth/github/callback
+      ENV: test
     services:
       postgres:
         image: postgres:15-alpine
@@ -37,34 +43,19 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 5
-
-    env:
-      DATABASE_URL: postgres://postgres:postgres@localhost:5432/genderize_test
-      JWT_SECRET: test-secret-key
-      GITHUB_CLIENT_ID: test-client-id
-      GITHUB_CLIENT_SECRET: test-client-secret
-      GITHUB_REDIRECT_URL: http://localhost:8080/auth/github/callback
-      ENV: test
-
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-go@v5
         with:
           go-version: '1.22'
-
-      - name: Run tests
-        run: go test ./...
+      - run: go test ./...
 
   build:
     name: Build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-go@v5
         with:
           go-version: '1.22'
-
-      - name: Build
-        run: go build ./...
+      - run: go build ./...
