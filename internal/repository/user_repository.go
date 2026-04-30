@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -17,6 +18,23 @@ type PostgresUserRepository struct {
 
 func NewPostgresUserRepository(pool *pgxpool.Pool) *PostgresUserRepository {
 	return &PostgresUserRepository{pool: pool}
+}
+
+func (r *PostgresUserRepository) FindByUsername(ctx context.Context, username string) (*domain.User, error) {
+    query := `
+        SELECT id, github_id, username, email, avatar_url, role, is_active
+        FROM users
+        WHERE username = $1`
+
+    var u domain.User
+    err := r.pool.QueryRow(ctx, query, username).Scan(
+        &u.ID, &u.GitHubID, &u.Username, &u.Email,
+        &u.AvatarURL, &u.Role, &u.IsActive,
+    )
+    if err != nil {
+        return nil, fmt.Errorf("user not found: %w", err)
+    }
+    return &u, nil
 }
 
 

@@ -27,5 +27,6 @@ type User struct {
 type UserRepository interface {
 	FindByID(id string) (*User, error)
 	FindByGitHubID(githubID string) (*User, error)
+     FindByUsername(ctx context.Context, username string) (*User, error)
 	Upsert(ctx context.Context, user *User) error
 }

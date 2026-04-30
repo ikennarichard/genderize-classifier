@@ -149,3 +149,21 @@ func SeedFromJSON(db *pgxpool.Pool, ctx context.Context, filePath string) error 
 
 	return nil
 }
+
+func SeedTestUsers(pool *pgxpool.Pool, ctx context.Context) error {
+    query := `
+        INSERT INTO users (id, github_id, username, email, avatar_url, role, is_active, created_at)
+        VALUES 
+            ($1, $2, 'insighta_admin', 'admin@insighta.com', '', 'admin', true, NOW()),
+            ($3, $4, 'insighta_analyst', 'analyst@insighta.com', '', 'analyst', true, NOW())
+        ON CONFLICT (github_id) DO NOTHING`
+
+    _, err := pool.Exec(ctx, query,
+        uuid.New().String(), "100000001", // admin
+        uuid.New().String(), "100000002", // analyst
+    )
+    if err != nil {
+        return fmt.Errorf("failed to seed test users: %w", err)
+    }
+    return nil
+}
