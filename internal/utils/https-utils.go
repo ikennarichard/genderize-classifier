@@ -3,8 +3,6 @@ package utils
 import (
 	"encoding/json"
 	"net/http"
-
-	"github.com/ikennarichard/genderize-classifier/internal/domain"
 )
 
 func Respond(w http.ResponseWriter, status int, payload any) {
@@ -14,7 +12,7 @@ func Respond(w http.ResponseWriter, status int, payload any) {
 }
 
 func RespondError(w http.ResponseWriter, status int, message string) {
-	Respond(w, status, domain.ErrorResponse{
+	Respond(w, status, ErrorResponse{
 		Status:  "error",
 		Message: message,
 	})
