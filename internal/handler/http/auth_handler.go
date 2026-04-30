@@ -100,7 +100,7 @@ func (h *AuthHandler) GitHubLogin(w http.ResponseWriter, r *http.Request) {
 		Path:     "/",
 		MaxAge:   300,
 		HttpOnly: true,
-		Secure:   false,
+		Secure:   true,
 		SameSite: http.SameSiteLaxMode,
 	})
 	http.SetCookie(w, &http.Cookie{
@@ -109,7 +109,7 @@ func (h *AuthHandler) GitHubLogin(w http.ResponseWriter, r *http.Request) {
 		Path:     "/",
 		MaxAge:   300,
 		HttpOnly: true,
-		Secure:   false,
+		Secure:   true,
 		SameSite: http.SameSiteLaxMode,
 	})
 
@@ -287,17 +287,17 @@ func (h *AuthHandler) GitHubCallback(w http.ResponseWriter, r *http.Request) {
 	http.SetCookie(w, &http.Cookie{
 		Name: "at", Value: access, Path: "/",
 		MaxAge:   int((15 * time.Minute).Seconds()),
-		HttpOnly: true, Secure: false, SameSite: http.SameSiteLaxMode,
+		HttpOnly: true, Secure: true, SameSite: http.SameSiteLaxMode,
 	})
 	http.SetCookie(w, &http.Cookie{
 		Name: "rt", Value: refresh, Path: "/",
 		MaxAge:   int((7 * 24 * time.Hour).Seconds()),
-		HttpOnly: true, Secure: false, SameSite: http.SameSiteLaxMode,
+		HttpOnly: true, Secure: true, SameSite: http.SameSiteLaxMode,
 	})
 	http.SetCookie(w, &http.Cookie{
 		Name: "csrf_token", Value: csrfToken, Path: "/",
 		MaxAge:   int((7 * 24 * time.Hour).Seconds()),
-		HttpOnly: true, Secure: false, SameSite: http.SameSiteLaxMode,
+		HttpOnly: true, Secure: true, SameSite: http.SameSiteLaxMode,
 	})
 
 	dashboardURL := os.Getenv("DASHBOARD_URL")
@@ -313,48 +313,46 @@ func (h *AuthHandler) GitHubCallback(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *AuthHandler) RefreshToken(w http.ResponseWriter, r *http.Request) {
-	var refreshToken string
+    var refreshToken string
 
-	// Cookie = web, body = CLI
-	rtCookie, err := r.Cookie("rt")
-	if err == nil {
-		refreshToken = rtCookie.Value
-	} else {
-		var req struct {
-			RefreshToken string `json:"refresh_token"`
-		}
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.RefreshToken == "" {
-			utils.RespondError(w, http.StatusBadRequest, "No refresh token provided")
-			return
-		}
-		refreshToken = req.RefreshToken
-	}
+    rtCookie, err := r.Cookie("rt")
+    if err == nil {
+        refreshToken = rtCookie.Value
+    } else {
+        var req struct {
+            RefreshToken string `json:"refresh_token"`
+        }
+        if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.RefreshToken == "" {
+            utils.RespondError(w, http.StatusBadRequest, "No refresh token provided")
+            return
+        }
+        refreshToken = req.RefreshToken
+    }
 
-	newAccess, newRefresh, err := h.TokenService.RotateRefreshToken(r.Context(), refreshToken)
-	if err != nil {
-		utils.RespondError(w, http.StatusUnauthorized, "Session expired or invalid")
-		return
-	}
+    newAccess, newRefresh, err := h.TokenService.RotateRefreshToken(r.Context(), refreshToken)
+    if err != nil {
+        utils.RespondError(w, http.StatusUnauthorized, "Session expired or invalid")
+        return
+    }
 
-	if rtCookie != nil {
-		http.SetCookie(w, &http.Cookie{
-			Name: "at", Value: newAccess, Path: "/",
-			MaxAge:   int((15 * time.Minute).Seconds()),
-			HttpOnly: true, SameSite: http.SameSiteNoneMode,
-		})
-		http.SetCookie(w, &http.Cookie{
-			Name: "rt", Value: newRefresh, Path: "/",
-			MaxAge:   int((7 * 24 * time.Hour).Seconds()),
-			HttpOnly: true, SameSite: http.SameSiteNoneMode,
-		})
-		utils.Respond(w, http.StatusOK, map[string]string{"status": "success"})
-		return
-	}
+    utils.Respond(w, http.StatusOK, map[string]any{
+        "status":        "success",
+        "access_token":  newAccess,
+        "refresh_token": newRefresh,
+    })
 
-	utils.Respond(w, http.StatusOK, map[string]any{
-		"access_token":  newAccess,
-		"refresh_token": newRefresh,
-	})
+    if rtCookie != nil {
+        http.SetCookie(w, &http.Cookie{
+            Name: "at", Value: newAccess, Path: "/",
+            MaxAge: int((15 * time.Minute).Seconds()),
+            HttpOnly: true, Secure: true, SameSite: http.SameSiteLaxMode,
+        })
+        http.SetCookie(w, &http.Cookie{
+            Name: "rt", Value: newRefresh, Path: "/",
+            MaxAge: int((7 * 24 * time.Hour).Seconds()),
+            HttpOnly: true, Secure: true, SameSite: http.SameSiteLaxMode,
+        })
+    }
 }
 
 func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {

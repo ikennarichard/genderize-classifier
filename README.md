@@ -45,6 +45,36 @@ While powerful, the current rule-based parser has specific constraints:
 - **Conflicting Age Logic:** If a user searches `"young adult"`, the system will apply both the `"young"` range (16–24) and the `"adult"` group filter, which may return zero results if they don't overlap in the data.
 - **Non-English Queries:** The parser is strictly tuned for English keywords.
 
+## Authentication Flow
+
+1. User hits `GET /auth/github` — redirected to GitHub with PKCE `code_challenge`
+2. GitHub redirects to `/auth/github/callback` with `code` + `state`
+3. Backend exchanges code for GitHub user info
+4. Issues JWT access token (15 min) + refresh token (7 days)
+5. Web: tokens stored in HTTP-only cookies
+6. CLI: tokens stored in `~/.insighta/credentials.json`
+
+To refresh: `POST /auth/refresh` with `refresh_token` in body or `rt` cookie.
+Returns new `access_token` and `refresh_token`.
+
+## Role Enforcement
+
+| Role | Permissions |
+|---|---|
+| `analyst` | Read-only — GET profiles, search, export |
+| `admin` | Full access — create and delete profiles |
+
+All `/api/profiles` routes require `X-API-Version: 1` header.
+Requests without it receive `400 Bad Request`.
+
+## CLI Usage
+
+```bash
+insighta login                          # opens GitHub in browser
+insighta profiles list --gender male    # list with filters
+insighta profiles export --format csv   # export to CSV
+```
+
 ## API Endpoints
 
 ### 1. Advanced Search (Standard Filters)

@@ -79,17 +79,33 @@ func (m *Middleware) VersionCheck(next http.Handler) http.Handler {
 }
 
 func (m *Middleware) RequireRole(role string) func(http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			user := r.Context().Value("user").(*domain.User)
-			
-			if role == "admin" && user.Role != "admin" {
-				utils.RespondError(w, http.StatusForbidden, "Admin access required")
-				return
-			}
-			next.ServeHTTP(w, r)
-		})
-	}
+    return func(next http.Handler) http.Handler {
+        return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+            user, ok := r.Context().Value("user").(*domain.User)
+            if !ok || user == nil {
+                utils.RespondError(w, http.StatusUnauthorized, "Unauthorized")
+                return
+            }
+
+            if !user.IsActive {
+                utils.RespondError(w, http.StatusForbidden, "Account is disabled")
+                return
+            }
+
+
+            if role == "admin" && user.Role != "admin" {
+                utils.RespondError(w, http.StatusForbidden, "Admin access required")
+                return
+            }
+
+            if role == "analyst" && user.Role != "analyst" && user.Role != "admin" {
+                utils.RespondError(w, http.StatusForbidden, "Access denied")
+                return
+            }
+
+            next.ServeHTTP(w, r)
+        })
+    }
 }
 
 func (m *Middleware) ValidateCSRF(next http.Handler) http.Handler {
