@@ -27,7 +27,7 @@ func main() {
 	r := chi.NewRouter()
 
 	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   []string{"http://localhost:5500", "http://127.0.0.1:5500"},
+		AllowedOrigins:   []string{"http://localhost:5500", "http://127.0.0.1:5500", "https://ikennarichard.github.io/insighta-web"},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Content-Type", "X-API-Version", "X-CSRF-Token", "Authorization"},
 		ExposedHeaders:   []string{"Link"},
