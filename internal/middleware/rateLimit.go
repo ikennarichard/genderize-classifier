@@ -1,80 +1,112 @@
 package middleware
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/ikennarichard/genderize-classifier/internal/domain"
 	"github.com/ikennarichard/genderize-classifier/internal/utils"
-	"golang.org/x/time/rate"
 )
 
-type IPRateLimiter struct {
-	ips map[string]*rate.Limiter
-	mu  sync.Mutex
-	r   rate.Limit
-	b   int
+type entry struct {
+	count   int
+	resetAt time.Time
 }
 
-func NewIPRateLimiter(r rate.Limit, b int) *IPRateLimiter {
-	return &IPRateLimiter{
-		ips: make(map[string]*rate.Limiter),
-		r:   r,
-		b:   b,
+type RateLimiter struct {
+	mu           sync.Mutex
+	clients      map[string]*entry
+	maxRequests  int
+	windowSeconds int
+}
+
+func newRateLimiter(maxRequests, windowSeconds int) *RateLimiter {
+	rl := &RateLimiter{
+		clients:       make(map[string]*entry),
+		maxRequests:   maxRequests,
+		windowSeconds: windowSeconds,
+	}
+
+	go func() {
+		ticker := time.NewTicker(1 * time.Minute)
+		defer ticker.Stop()
+		for range ticker.C {
+			rl.mu.Lock()
+			now := time.Now()
+			for key, e := range rl.clients {
+				if now.After(e.resetAt) {
+					delete(rl.clients, key)
+				}
+			}
+			rl.mu.Unlock()
+		}
+	}()
+
+	return rl
+}
+
+func RateLimit(maxRequests, windowSeconds int) func(http.Handler) http.Handler {
+	rl := newRateLimiter(maxRequests, windowSeconds)
+
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			key := resolveKey(r)
+
+			rl.mu.Lock()
+			now := time.Now()
+			c, exists := rl.clients[key]
+
+			if !exists || now.After(c.resetAt) {
+				rl.clients[key] = &entry{
+					count:   1,
+					resetAt: now.Add(time.Duration(rl.windowSeconds) * time.Second),
+				}
+				rl.mu.Unlock()
+
+				setRateLimitHeaders(w, rl.maxRequests, rl.maxRequests-1)
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			c.count++
+			remaining := rl.maxRequests - c.count
+
+			if c.count > rl.maxRequests {
+				rl.mu.Unlock()
+
+				w.Header().Set("Retry-After", fmt.Sprintf("%d", rl.windowSeconds))
+				setRateLimitHeaders(w, rl.maxRequests, 0)
+				utils.RespondError(w, http.StatusTooManyRequests, "Rate limit exceeded — try again later")
+				return
+			}
+
+			rl.mu.Unlock()
+
+			setRateLimitHeaders(w, rl.maxRequests, remaining)
+			next.ServeHTTP(w, r)
+		})
 	}
 }
 
-func (i *IPRateLimiter) GetLimiter(ip string) *rate.Limiter {
-	i.mu.Lock()
-	defer i.mu.Unlock()
 
-	limiter, exists := i.ips[ip]
-	if !exists {
-		limiter = rate.NewLimiter(i.r, i.b)
-		i.ips[ip] = limiter
+func resolveKey(r *http.Request) string {
+
+	if user, ok := r.Context().Value("user").(*domain.User); ok && user != nil {
+		return "user:" + user.ID
 	}
 
-	return limiter
+	forwarded := r.Header.Get("X-Forwarded-For")
+	if forwarded != "" {
+		return "ip:" + strings.TrimSpace(strings.Split(forwarded, ",")[0])
+	}
+
+	return "ip:" + r.RemoteAddr
 }
 
-func RateLimit(maxRequests int, windowSeconds int) func(http.Handler) http.Handler {
-    type client struct {
-        count    int
-        resetAt  time.Time
-    }
-
-    var (
-        mu      sync.Mutex
-        clients = make(map[string]*client)
-    )
-
-    return func(next http.Handler) http.Handler {
-        return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-            ip := r.RemoteAddr
-            if forwarded := r.Header.Get("X-Forwarded-For"); forwarded != "" {
-                ip = strings.Split(forwarded, ",")[0]
-            }
-
-            mu.Lock()
-            c, exists := clients[ip]
-            if !exists || time.Now().After(c.resetAt) {
-                clients[ip] = &client{
-                    count:   1,
-                    resetAt: time.Now().Add(time.Duration(windowSeconds) * time.Second),
-                }
-                mu.Unlock()
-                next.ServeHTTP(w, r)
-                return
-            }
-            c.count++
-            if c.count > maxRequests {
-                mu.Unlock()
-                utils.RespondError(w, http.StatusTooManyRequests, "Rate limit exceeded — try again later")
-                return
-            }
-            mu.Unlock()
-            next.ServeHTTP(w, r)
-        })
-    }
+func setRateLimitHeaders(w http.ResponseWriter, limit, remaining int) {
+	w.Header().Set("X-RateLimit-Limit", fmt.Sprintf("%d", limit))
+	w.Header().Set("X-RateLimit-Remaining", fmt.Sprintf("%d", remaining))
 }
