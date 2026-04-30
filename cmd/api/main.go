@@ -114,7 +114,7 @@ func RegisterRoutes(r *chi.Mux, h *handler.ProfileHandler, authH *handler.AuthHa
 		
 		r.Route("/profiles", func(r chi.Router) {
 			r.Use(m.VersionCheck)
-			// analyst access: read only
+			// analyst access: read only routes
 			r.Group(func(r chi.Router) {
 				r.Get("/", h.ListProfiles)
 				r.Get("/search", h.SearchProfiles)
