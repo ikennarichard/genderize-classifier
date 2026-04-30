@@ -3,6 +3,7 @@ package config
 import (
 	"context"
 	"log"
+	"log/slog"
 	"os"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -40,9 +41,20 @@ func Load() (*pgxpool.Pool, context.Context) {
 	return pool, ctx
 }
 
-func getEnv(key, defaultVal string) string {
-    if val := os.Getenv(key); val != "" {
-        return val
-    }
-    return defaultVal
+
+func InitLogger() {
+	var handler slog.Handler
+	
+	if os.Getenv("ENV") == "production" {
+		handler = slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+			Level: slog.LevelInfo,
+		})
+	} else {
+		handler = slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+			Level: slog.LevelDebug,
+		})
+	}
+
+	logger := slog.New(handler)
+	slog.SetDefault(logger)
 }

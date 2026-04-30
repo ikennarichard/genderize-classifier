@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -13,65 +14,63 @@ import (
 	"github.com/ikennarichard/genderize-classifier/internal/utils"
 )
 
-type Handler struct {
+type ProfileHandler struct {
 	repo domain.ProfileRepository 
 }
 
-func New(repo domain.ProfileRepository) *Handler {
-	return &Handler{repo: repo}
-}
-
-func (h *Handler) RegisterProfileRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("POST /api/profiles", h.createProfile)
-	mux.HandleFunc("GET /api/profiles/{id}", h.getProfile)
-	mux.HandleFunc("GET /api/profiles", h.listProfiles)
-	mux.HandleFunc("DELETE /api/profiles/{id}", h.deleteProfile)
-	mux.HandleFunc("GET /api/profiles/search", h.searchProfiles)
+func New(repo domain.ProfileRepository) *ProfileHandler {
+	return &ProfileHandler{repo: repo}
 }
 
 
-func (h *Handler) searchProfiles(w http.ResponseWriter, r *http.Request) {
-	queryStr := r.URL.Query().Get("q")
-	if queryStr == "" {
-		utils.RespondError(w, http.StatusBadRequest, "Query parameter 'q' is required")
-		return
-	}
+func (h *ProfileHandler) SearchProfiles(w http.ResponseWriter, r *http.Request) {
+    queryStr := strings.TrimSpace(r.URL.Query().Get("q"))
+    if queryStr == "" {
+        utils.RespondError(w, http.StatusBadRequest, "Query parameter 'q' is required")
+        return
+    }
 
-	filters, err := service.ParseNaturalLanguage(queryStr)
-	if err != nil {
-		utils.RespondError(w, http.StatusBadRequest, "Unable to interpret query")
-		return
-	}
+    filters, err := service.ParseNaturalLanguage(queryStr)
+    if err != nil {
+        utils.RespondError(w, http.StatusBadRequest, "Unable to interpret query")
+        return
+    }
 
-	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
-	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
-	if page < 1 { page = 1 }
-	if limit <= 0 || limit > 50 { limit = 10 }
-	
-	filters.Page = page
-	filters.Limit = limit
+    page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+    limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+    if page < 1 {
+        page = 1
+    }
+    if limit <= 0 || limit > 50 {
+        limit = 10
+    }
 
     if err := filters.Validate(); err != nil {
         utils.RespondError(w, http.StatusBadRequest, "Invalid query parameters")
         return
     }
 
-	profiles, total, err := h.repo.GetFiltered(r.Context(), filters)
-	if err != nil {
-		utils.RespondError(w, 500, "Database error")
-		return
-	}
+    profiles, total, err := h.repo.GetFiltered(r.Context(), filters, page, limit)
+    if err != nil {
+        utils.RespondError(w, http.StatusInternalServerError, "Database error")
+        return
+    }
 
-	utils.Respond(w, http.StatusOK, map[string]any{
-		"status": "success",
-		"page":   page,
-		"limit":  limit,
-		"total":  total,
-		"data":   mapToDTOs(profiles),
-	})
+    data := mapToDTOs(profiles)
+
+    resp := utils.BuildPaginatedResponse(
+        data,
+        page,
+        limit,
+        total,
+        "/api/profiles/search",
+        r.URL.Query(),
+    )
+
+    utils.Respond(w, http.StatusOK, resp)
 }
 
-func (h *Handler) createProfile(w http.ResponseWriter, r *http.Request) {
+func (h *ProfileHandler) CreateProfile(w http.ResponseWriter, r *http.Request) {
 	var req CreateProfileRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		utils.RespondError(w, http.StatusUnprocessableEntity, "invalid request body")
@@ -102,6 +101,10 @@ func (h *Handler) createProfile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.repo.Create(r.Context(), profile); err != nil {
+		slog.Error("failed to create profile", 
+            "error", err, 
+            "user_id", r.Context().Value("user_id"),
+        )
 		utils.RespondError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
@@ -109,7 +112,7 @@ func (h *Handler) createProfile(w http.ResponseWriter, r *http.Request) {
 	utils.Respond(w, http.StatusCreated, ProfileResponse{Status: "success", Data: &createdRes})
 }
 
-func (h *Handler) getProfile(w http.ResponseWriter, r *http.Request) {
+func (h *ProfileHandler) GetProfile(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	profile, err := h.repo.GetByID(r.Context(), id)
 	if err != nil {
@@ -121,7 +124,7 @@ func (h *Handler) getProfile(w http.ResponseWriter, r *http.Request) {
 	utils.Respond(w, http.StatusOK, ProfileResponse{Status: "success", Data: &profileRes})
 }
 
-func (h *Handler) listProfiles(w http.ResponseWriter, r *http.Request) {
+func (h *ProfileHandler) ListProfiles(w http.ResponseWriter, r *http.Request) {
     q := r.URL.Query()
 
     parseInt := func(key string) (*int, error) {
@@ -152,15 +155,7 @@ func (h *Handler) listProfiles(w http.ResponseWriter, r *http.Request) {
         limit = 50
     }
 
-    filters := domain.ProfileFilters{
-        Gender:    strings.TrimSpace(q.Get("gender")),
-        AgeGroup:  strings.TrimSpace(q.Get("age_group")),
-        CountryID: strings.TrimSpace(q.Get("country_id")),
-				SortBy: q.Get("sort_by"),
-        Order:  q.Get("order"),
-        Page:   page,
-        Limit:  limit,
-    }
+    filters := h.parseFilters(r)
 
     if filters.MinAge, err = parseInt("min_age"); err != nil {
         utils.RespondError(w, http.StatusUnprocessableEntity, "Invalid min_age parameter")
@@ -184,35 +179,25 @@ func (h *Handler) listProfiles(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-		profiles, total, err := h.repo.GetFiltered(r.Context(), filters)
+		profiles, total, err := h.repo.GetFiltered(r.Context(), filters, page, limit)
     if err != nil {
 			fmt.Println("GetFiltered Error:", err.Error())
         utils.RespondError(w, 500, "Database failure")
         return
     }
 
-    data := make([]ProfileDTO, len(profiles))
-    for i, p := range profiles {
-        data[i] = fromDomain(&p)
-    }
+    data := mapToDTOs(profiles)
 
-    utils.Respond(w, http.StatusOK, map[string]any{
-        "status": "success",
-        "count":  len(data),
-				"page":   filters.Page,
-        "limit":  filters.Limit,
-        "total":  total,
-        "data":   data,
-    })
-}
 
-func (h *Handler) deleteProfile(w http.ResponseWriter, r *http.Request) {
-	err := h.repo.Delete(r.Context(), r.PathValue("id"))
-	if err != nil {
-		utils.RespondError(w, http.StatusNotFound, "Profile not found")
-		return
-	}
-	w.WriteHeader(http.StatusNoContent)
+     resp := utils.BuildPaginatedResponse(
+        data, 
+        page, 
+        limit, 
+        total, 
+        "/api/v1/profiles", 
+        r.URL.Query(),
+    )
+		utils.Respond(w, http.StatusOK, resp)
 }
 
 func fromDomain(p *domain.Profile) ProfileDTO {
@@ -240,3 +225,42 @@ func mapToDTOs(profiles []domain.Profile) []ProfileDTO {
 	
 	return dtos
 }
+
+func (h *ProfileHandler) parseFilters(r *http.Request) domain.ProfileFilters {
+	q := r.URL.Query()
+
+	filters := domain.ProfileFilters{
+		Gender:    strings.TrimSpace(q.Get("gender")),
+		CountryID: strings.TrimSpace(q.Get("country_id")),
+		AgeGroup:  strings.TrimSpace(q.Get("age_group")),
+		SortBy:    strings.TrimSpace(strings.ToLower(q.Get("sort_by"))),
+		Order:     strings.TrimSpace(strings.ToLower(q.Get("order"))),
+	}
+
+	if minAge, err := strconv.Atoi(q.Get("min_age")); err == nil {
+		filters.MinAge = &minAge
+	}
+	if maxAge, err := strconv.Atoi(q.Get("max_age")); err == nil {
+		filters.MaxAge = &maxAge
+	}
+
+	if minProb, err := strconv.ParseFloat(q.Get("min_gender_probability"), 64); err == nil {
+		filters.MinGenderProb = &minProb
+	}
+
+	page, err := strconv.Atoi(q.Get("page"))
+	if err != nil || page < 1 {
+		page = 1
+	}
+
+
+	limit, err := strconv.Atoi(q.Get("limit"))
+	if err != nil || limit < 1 {
+		limit = 10
+	} else if limit > 100 {
+		limit = 100
+	}
+
+	return filters
+}
+

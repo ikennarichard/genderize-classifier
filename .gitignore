@@ -15,5 +15,16 @@
 *.app
 *.env
 .env
-.env*
 *.rest
+
+# Backend + CLI
+.env
+*.env
+
+# CLI credentials
+.insighta/
+
+# Build output
+dist/
+insighta
+insighta.exe
