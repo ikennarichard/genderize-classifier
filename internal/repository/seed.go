@@ -4,13 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strings"
+	"os"
 	"time"
 
 	_ "embed"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 //go:embed seed_profiles.json
@@ -31,10 +32,69 @@ type ProfileSeedDTO struct {
 	CountryProbability float64 `json:"country_probability"`
 }
 
-func (r *PostgresProfileRepository) SeedFromJSON(ctx context.Context, filePath string) error {
-    reader := strings.NewReader(string(seedJSON))
-    decoder := json.NewDecoder(reader)
+func InitSchema(db *pgxpool.Pool, ctx context.Context) error {
+	schema := `
+DROP TABLE IF EXISTS users CASCADE;
+	
+CREATE TABLE IF NOT EXISTS users (
+    id UUID PRIMARY KEY,
+    github_id BIGINT UNIQUE NOT NULL,
+    username TEXT NOT NULL,
+    email TEXT,
+    avatar_url TEXT,
+    role TEXT DEFAULT 'analyst',
+    is_active BOOLEAN DEFAULT true,
+    last_login_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
 
+	CREATE TABLE IF NOT EXISTS sessions (
+		id UUID PRIMARY KEY,
+		user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+		token TEXT UNIQUE NOT NULL,
+		is_revoked BOOLEAN DEFAULT false,
+		expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+		created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+	);
+
+	CREATE TABLE IF NOT EXISTS profiles (
+		id UUID PRIMARY KEY,
+		name TEXT UNIQUE NOT NULL,
+		gender TEXT,
+		gender_probability DOUBLE PRECISION,
+		sample_size INTEGER,
+		age INTEGER,
+		age_group TEXT,
+		country_id TEXT,
+		country_name TEXT,
+		country_probability DOUBLE PRECISION,
+		created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+	);
+	`
+
+	_, err := db.Exec(ctx, schema)
+	if err != nil {
+		return fmt.Errorf("failed to initialize schema: %w", err)
+	}
+	fmt.Println("Database schema initialized successfully")
+	return nil
+}
+
+func SeedFromJSON(db *pgxpool.Pool, ctx context.Context, filePath string) error {
+	if err := InitSchema(db, ctx); err != nil {
+		return err
+	}
+
+	// 2. Open and read the seed file
+	file, err := os.Open(filePath)
+	if err != nil {
+		return fmt.Errorf("could not open seed file: %w", err)
+	}
+	defer file.Close()
+
+	decoder := json.NewDecoder(file)
+
+	// Navigate to "profiles" array in the JSON
 	for {
 		t, err := decoder.Token()
 		if err != nil {
@@ -60,7 +120,6 @@ func (r *PostgresProfileRepository) SeedFromJSON(ctx context.Context, filePath s
 	now := time.Now().UTC()
 	count := 0
 
-	// Stream individual profile objects
 	for decoder.More() {
 		var s ProfileSeedDTO
 		if err := decoder.Decode(&s); err != nil {
@@ -68,17 +127,8 @@ func (r *PostgresProfileRepository) SeedFromJSON(ctx context.Context, filePath s
 		}
 
 		batch.Queue(query,
-			uuid.New(),
-			s.Name,
-			s.Gender,
-			s.GenderProbability,
-			0,
-			s.Age,
-			s.AgeGroup,
-			s.CountryID,
-			s.CountryName,
-			s.CountryProbability,
-			now,
+			uuid.New(), s.Name, s.Gender, s.GenderProbability, 0,
+			s.Age, s.AgeGroup, s.CountryID, s.CountryName, s.CountryProbability, now,
 		)
 		count++
 	}
@@ -87,13 +137,12 @@ func (r *PostgresProfileRepository) SeedFromJSON(ctx context.Context, filePath s
 		return nil
 	}
 
-	fmt.Println("executing streaming batch seed", "count", count)
-	results := r.db.SendBatch(ctx, batch)
+	fmt.Printf("Executing streaming batch seed: %d records\n", count)
+	results := db.SendBatch(ctx, batch)
 	defer results.Close()
 
 	for i := 0; i < count; i++ {
-		_, err := results.Exec()
-		if err != nil {
+		if _, err := results.Exec(); err != nil {
 			return fmt.Errorf("batch error at index %d: %w", i, err)
 		}
 	}
