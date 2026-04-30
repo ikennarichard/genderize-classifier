@@ -70,36 +70,35 @@ func (h *AuthHandler) GitHubLogin(w http.ResponseWriter, r *http.Request) {
 			RedirectURI:   redirectURI,
 		})
 
-		slog.Info("cli login initiated", "state", state, "redirect_uri", redirectURI)
-
 		authURL := h.OauthConfig.AuthCodeURL(
 			state,
 			oauth2.SetAuthURLParam("code_challenge", codeChallenge),
 			oauth2.SetAuthURLParam("code_challenge_method", "S256"),
 		)
-		http.Redirect(w, r, authURL, http.StatusTemporaryRedirect)
+		http.Redirect(w, r, authURL, http.StatusFound)
 		return
 	}
 
 	// Web flow
 	state, err := generateState()
 	if err != nil {
-		http.Error(w, "Failed to generate state", http.StatusInternalServerError)
+		utils.RespondError(w, http.StatusInternalServerError, "Failed to generate state")
 		return
 	}
 	codeVerifier, err := generateCodeVerifier()
 	if err != nil {
-		http.Error(w, "Failed to generate code verifier", http.StatusInternalServerError)
+		utils.RespondError(w, http.StatusInternalServerError, "Failed to generate code verifier")
 		return
 	}
 	codeChallenge := generateCodeChallenge(codeVerifier)
+
 
 	http.SetCookie(w, &http.Cookie{
 		Name:     "oauth_state",
 		Value:    state,
 		Path:     "/",
 		MaxAge:   300,
-		HttpOnly: true,
+		HttpOnly: true, 
 		Secure:   true,
 		SameSite: http.SameSiteLaxMode,
 	})
@@ -115,12 +114,13 @@ func (h *AuthHandler) GitHubLogin(w http.ResponseWriter, r *http.Request) {
 
 	authURL := h.OauthConfig.AuthCodeURL(
 		state,
-		oauth2.AccessTypeOffline,
 		oauth2.SetAuthURLParam("code_challenge", codeChallenge),
 		oauth2.SetAuthURLParam("code_challenge_method", "S256"),
 	)
-	http.Redirect(w, r, authURL, http.StatusTemporaryRedirect)
+
+	http.Redirect(w, r, authURL, http.StatusFound)
 }
+
 
 func (h *AuthHandler) handleTestCode(w http.ResponseWriter, r *http.Request) {
     // Fetch the seeded admin user
@@ -390,7 +390,18 @@ func (h *AuthHandler) GetCurrentUser(w http.ResponseWriter, r *http.Request) {
 		utils.RespondError(w, http.StatusUnauthorized, "Unauthorized")
 		return
 	}
-	utils.Respond(w, http.StatusOK, map[string]any{"status": "success", "data": user})
+	utils.Respond(w, http.StatusOK, map[string]any{
+		"status": "success",
+		"data": map[string]any{
+			"id":         user.ID,
+			"github_id":  user.GitHubID,
+			"username":   user.Username,
+			"email":      user.Email,
+			"avatar_url": user.AvatarURL,
+			"role":       user.Role,
+			"is_active":  user.IsActive,
+		},
+	})
 }
 
 
