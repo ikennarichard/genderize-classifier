@@ -5,10 +5,10 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/ikennarichard/genderize-classifier/internal/domain"
-	"github.com/ikennarichard/genderize-classifier/internal/repository"
-	"github.com/ikennarichard/genderize-classifier/internal/service"
-	"github.com/ikennarichard/genderize-classifier/internal/utils"
+	"github.com/ikennarichard/insighta/internal/domain"
+	"github.com/ikennarichard/insighta/internal/repository"
+	"github.com/ikennarichard/insighta/internal/service"
+	"github.com/ikennarichard/insighta/internal/utils"
 )
 
 type Middleware struct {

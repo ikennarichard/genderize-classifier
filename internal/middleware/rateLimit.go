@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ikennarichard/genderize-classifier/internal/domain"
-	"github.com/ikennarichard/genderize-classifier/internal/utils"
+	"github.com/ikennarichard/insighta/internal/domain"
+	"github.com/ikennarichard/insighta/internal/utils"
 )
 
 type entry struct {

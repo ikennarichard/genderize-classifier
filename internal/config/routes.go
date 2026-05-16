@@ -6,9 +6,9 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
-	handler "github.com/ikennarichard/genderize-classifier/internal/handler/http"
-	"github.com/ikennarichard/genderize-classifier/internal/middleware"
-	"github.com/ikennarichard/genderize-classifier/internal/utils"
+	handler "github.com/ikennarichard/insighta/internal/handler/http"
+	"github.com/ikennarichard/insighta/internal/middleware"
+	"github.com/ikennarichard/insighta/internal/utils"
 )
 
 func RegisterRoutes(r *chi.Mux, h *handler.ProfileHandler, authH *handler.AuthHandler, m *middleware.Middleware, importHandler handler.ImportHandler) http.Handler {

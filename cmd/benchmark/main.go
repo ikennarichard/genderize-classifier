@@ -211,7 +211,7 @@ func main() {
 	token := os.Getenv("API_TOKEN")
 
 	if baseURL == "" {
-		baseURL = "https://genderize-plum.vercel.app"
+		baseURL = "https://127.0.0.1:8080"
 	}
 	if token == "" {
 		fmt.Println("ERROR: API_TOKEN environment variable required")

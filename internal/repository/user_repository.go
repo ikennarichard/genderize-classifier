@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/ikennarichard/genderize-classifier/internal/domain"
+	"github.com/ikennarichard/insighta/internal/domain"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -16,7 +16,7 @@ type PostgresUserRepository struct {
 	pool *pgxpool.Pool
 }
 
-func NewPostgresUserRepository(pool *pgxpool.Pool) *PostgresUserRepository {
+func NewPostgresUserRepository(pool *pgxpool.Pool) domain.UserRepository {
 	return &PostgresUserRepository{pool: pool}
 }
 

@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/ikennarichard/genderize-classifier/internal/client"
-	"github.com/ikennarichard/genderize-classifier/internal/domain"
+	"github.com/ikennarichard/insighta/internal/client"
+	"github.com/ikennarichard/insighta/internal/domain"
 )
 
 

@@ -13,9 +13,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/ikennarichard/genderize-classifier/internal/cache"
-	"github.com/ikennarichard/genderize-classifier/internal/domain"
-	"github.com/ikennarichard/genderize-classifier/internal/utils"
+	"github.com/ikennarichard/insighta/internal/cache"
+	"github.com/ikennarichard/insighta/internal/domain"
+	"github.com/ikennarichard/insighta/internal/utils"
 )
 
 const (
@@ -41,8 +41,6 @@ func NewImportHandler(repo domain.ProfileRepository, c *cache.Cache) *ImportHand
 	return &ImportHandler{repo: repo, cache: c}
 }
 
-// ImportProfiles handles POST /api/profiles/import
-// Accepts multipart form with a "file" field containing a CSV
 func (h *ImportHandler) ImportProfiles(w http.ResponseWriter, r *http.Request) {
 	// Limit memory used for multipart parsing — stream the rest to disk
 	if err := r.ParseMultipartForm(32 << 20); err != nil {

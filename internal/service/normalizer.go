@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/ikennarichard/genderize-classifier/internal/domain"
+	"github.com/ikennarichard/insighta/internal/domain"
 )
 
 // NormalizeFilters converts a ProfileFilters into a canonical form.

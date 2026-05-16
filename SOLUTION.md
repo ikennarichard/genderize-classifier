@@ -32,11 +32,11 @@ done in a goroutine so they never delay the response.
 
 | Metric | Before (cold) | After (warm cache) | Improvement |
 |--------|--------------|-------------------|-------------|
-| P50    | ~420ms       | ~38ms             | ~91%        |
-| P95    | ~890ms       | ~95ms             | ~89%        |
-| P99    | ~1200ms      | ~140ms            | ~88%        |
-| Avg    | ~480ms       | ~45ms             | ~91%        |
-| Cache hit rate | 0%  | ~87%              | —           |
+| P50    | ~129ms       | ~50ms             | ~61%        |
+| P95    | ~1400ms      | ~83ms             | ~89%        |
+| P99    | ~1500ms      | ~140ms            | ~94.2%        |
+| Avg    | ~272ms       | ~51ms             | ~81.3%        |
+| Cache hit rate | 0%   | ~87%              | —           |
 
 The before figures reflect uncached database queries over a remote
 connection. The after figures reflect a warm cache where ~87% of requests

@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/ikennarichard/genderize-classifier/internal/domain"
+	"github.com/ikennarichard/insighta/internal/domain"
 )
 
 

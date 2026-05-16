@@ -3,7 +3,7 @@ package service
 import (
 	"testing"
 
-	"github.com/ikennarichard/genderize-classifier/internal/domain"
+	"github.com/ikennarichard/insighta/internal/domain"
 )
 
 func TestNormalizeFilters(t *testing.T) {

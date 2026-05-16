@@ -5,7 +5,7 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/ikennarichard/genderize-classifier/internal/utils"
+	"github.com/ikennarichard/insighta/internal/utils"
 )
 
 func WriteError(w http.ResponseWriter, err error) {

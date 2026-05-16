@@ -10,10 +10,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ikennarichard/genderize-classifier/internal/cache"
-	"github.com/ikennarichard/genderize-classifier/internal/domain"
-	"github.com/ikennarichard/genderize-classifier/internal/service"
-	"github.com/ikennarichard/genderize-classifier/internal/utils"
+	"github.com/ikennarichard/insighta/internal/cache"
+	"github.com/ikennarichard/insighta/internal/domain"
+	"github.com/ikennarichard/insighta/internal/service"
+	"github.com/ikennarichard/insighta/internal/utils"
 )
 
 type ProfileHandler struct {

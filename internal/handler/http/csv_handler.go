@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/ikennarichard/genderize-classifier/internal/utils"
+	"github.com/ikennarichard/insighta/internal/utils"
 )
 
 func (h *ProfileHandler) ExportProfiles(w http.ResponseWriter, r *http.Request) {

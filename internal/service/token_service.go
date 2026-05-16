@@ -8,8 +8,8 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
-	"github.com/ikennarichard/genderize-classifier/internal/domain"
-	"github.com/ikennarichard/genderize-classifier/internal/repository"
+	"github.com/ikennarichard/insighta/internal/domain"
+	"github.com/ikennarichard/insighta/internal/repository"
 )
 
 type TokenService struct {
